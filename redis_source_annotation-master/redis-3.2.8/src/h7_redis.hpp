@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include "zmalloc.h"
 #include "ziplist.h"
 #include "zipmap.h"
 #include "quicklist.h"

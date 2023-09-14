@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.5)
 
 project(stu_ziplist LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ##
@@ -39,8 +39,9 @@ add_library(redis
     h7_redis.hpp
     )
 
+file(GLOB_RECURSE SRC_H7_TEST  h7/*.cpp h7/*.h h7/*.hpp)
+
 add_executable(test_redis
-    h7/main.cpp
-    h7/test_ziplist.cpp
+    ${SRC_H7_TEST}
     )
 target_link_libraries(test_redis PUBLIC redis)
