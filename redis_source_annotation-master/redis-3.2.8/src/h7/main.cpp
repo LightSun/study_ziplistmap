@@ -35,6 +35,7 @@ void test_Ziplist(){
     assert(list.size() == 2);
     assert(list.get(0) == "abc");
     assert(list.get(1) == "gh");
+    assert(list.get(10) == "");
 
     assert(list.indexOf("abc") == 0);
     assert(list.indexOf("gh") == 1);

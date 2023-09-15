@@ -29,6 +29,10 @@ public:
     int size();
     void clear();
 
+    bool contains(CString data){
+        return indexOf(data) >= 0;
+    }
+
 private:
     _quicklistP m_ptr {nullptr};
     int m_max_entry_ev {32};

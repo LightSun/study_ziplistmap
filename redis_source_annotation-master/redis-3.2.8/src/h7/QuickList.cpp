@@ -14,6 +14,7 @@ QuickList::~QuickList(){
 }
 
 void QuickList::setParams(int max_entry_ev_list, int compress){
+    //max_entry_ev_list: max = 1 << 15. compress >= 0
     quicklistSetFill(m_ptr, max_entry_ev_list);
     quicklistSetCompressDepth(m_ptr, compress);
     m_max_entry_ev = max_entry_ev_list;

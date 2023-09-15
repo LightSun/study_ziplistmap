@@ -24,6 +24,10 @@ public:
     int size();
     void clear();
 
+    bool contains(CString data){
+        return indexOf(data) >= 0;
+    }
+
 private:
     u8* m_ptr {nullptr};
 };
