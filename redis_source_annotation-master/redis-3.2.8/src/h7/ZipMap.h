@@ -1,8 +1,12 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
+#include <vector>
+#include <map>
 
 namespace h7 {
+
+class ZipList;
 
 class ZipMap
 {
@@ -20,6 +24,14 @@ public:
     bool containsValue(CString val);
     int size();
     void clear();
+
+    void keys(ZipList* list);
+    std::vector<String> keys();
+
+    void values(ZipList* list);
+    std::vector<String> values();
+
+    std::map<String, String> toMap();
 
 private:
     u8* m_ptr;

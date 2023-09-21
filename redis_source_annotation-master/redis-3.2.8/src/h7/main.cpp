@@ -8,6 +8,7 @@ using namespace h7;
 
 static void test_Ziplist();
 static void test_QuickList();
+extern void test_JudyList();
 
 int main (int argc, char* argv[]){
     setbuf(stdout, NULL);
@@ -21,6 +22,7 @@ int main (int argc, char* argv[]){
 
     test_Ziplist();
     test_QuickList();
+    test_JudyList();
 
     return 0;
 }
@@ -47,6 +49,7 @@ void test_Ziplist(){
     //printf("test_Ziplist >> s2 = %s\n", s2.data());
     assert(list.get(0) == "abc");
     assert(list.get(1) == "12345");
+    //
 }
 
 void test_QuickList(){

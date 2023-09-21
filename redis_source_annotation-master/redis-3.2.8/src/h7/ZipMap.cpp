@@ -1,8 +1,18 @@
 #include "ZipMap.h"
 #include "h7_redis.hpp"
-
+#include "ZipList.h"
 
 using namespace h7;
+
+#define LOOP_zipmap(code)\
+    unsigned char *i = zipmapRewind(m_ptr);\
+    unsigned char *key, *value;\
+    unsigned int klen, vlen;\
+    while((i = zipmapNext(i,&key,&klen,&value,&vlen)) != NULL) {\
+        code;\
+    }
+
+
 ZipMap::ZipMap(){
     m_ptr = zipmapNew();
 }
@@ -46,4 +56,36 @@ int ZipMap::size(){
 void ZipMap::clear(){
     zfree(m_ptr);
     m_ptr = zipmapNew();
+}
+//----------------------------
+void ZipMap::keys(ZipList* list){
+    LOOP_zipmap({
+        list->add(String((char*)key, klen));
+                })
+}
+std::vector<ZipMap::String> ZipMap::keys(){
+    std::vector<ZipMap::String> vec;
+    LOOP_zipmap({
+        vec.emplace_back((char*)key, klen);
+                });
+    return vec;
+}
+void ZipMap::values(ZipList* list){
+    LOOP_zipmap({
+        list->add(String((char*)value, vlen));
+                })
+}
+std::vector<ZipMap::String> ZipMap::values(){
+    std::vector<ZipMap::String> vec;
+    LOOP_zipmap({
+        vec.emplace_back((char*)value, vlen);
+                });
+    return vec;
+}
+std::map<ZipMap::String, ZipMap::String> ZipMap::toMap(){
+    std::map<ZipMap::String, ZipMap::String> map;
+    LOOP_zipmap({
+       map[String((char*)key, klen)] = String((char*)value, vlen);
+                });
+    return map;
 }

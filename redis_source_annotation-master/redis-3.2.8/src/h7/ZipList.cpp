@@ -7,6 +7,26 @@ ZipList::ZipList()
 {
     m_ptr = ziplistNew();
 }
+ZipList::ZipList(const std::vector<String>& _list){
+    m_ptr = ziplistNew();
+    for(auto it = _list.begin() ; it != _list.end() ; ++it){
+        add(*it);
+    }
+}
+ZipList::ZipList(const std::initializer_list<String>& _list){
+    m_ptr = ziplistNew();
+    for(auto it = _list.begin() ; it != _list.end() ; ++it){
+        add(*it);
+    }
+}
+ZipList::ZipList(const ZipList& _list){
+    m_ptr = ziplistNew();
+    ZipList* zl = (ZipList*)&_list;
+    int size = zl->size();
+    for(int i = 0 ; i < size ; ++i){
+        add(zl->get(i));
+    }
+}
 ZipList::~ZipList(){
     if(m_ptr){
         zfree(m_ptr);
@@ -73,4 +93,12 @@ int ZipList::size(){
 void ZipList::clear(){
     zfree(m_ptr);
     m_ptr = ziplistNew();
+}
+//-------
+void ZipList::toVector(std::vector<String>& vec){
+    int _size = size();
+    for(int i = 0; i < _size ; ++i){
+        String str = get(i);
+        vec.push_back(std::move(str));
+    }
 }

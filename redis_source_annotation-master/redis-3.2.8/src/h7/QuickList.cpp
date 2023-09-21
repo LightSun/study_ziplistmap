@@ -3,8 +3,26 @@
 
 using namespace h7;
 
-QuickList::QuickList(){
-    m_ptr = quicklistNew(m_max_entry_ev, m_compress);
+QuickList::QuickList(_InitPs ip): m_params(ip){
+    m_ptr = quicklistNew(ip.max_entry_ev_list, ip.compress);
+}
+QuickList::QuickList(const std::vector<String>& _list, _InitPs ip): QuickList(ip){
+    for(auto it = _list.begin() ; it != _list.end() ; ++it){
+        add(*it);
+    }
+}
+QuickList::QuickList(const std::initializer_list<String>& _list, _InitPs ip):
+        QuickList(ip){
+    for(auto it = _list.begin() ; it != _list.end() ; ++it){
+        add(*it);
+    }
+}
+QuickList::QuickList(const QuickList& list): QuickList(list.m_params){
+    QuickList* zl = (QuickList*)&list;
+    int size = zl->size();
+    for(int i = 0 ; i < size ; ++i){
+        add(zl->get(i));
+    }
 }
 QuickList::~QuickList(){
     if(m_ptr){
@@ -13,12 +31,11 @@ QuickList::~QuickList(){
     }
 }
 
-void QuickList::setParams(int max_entry_ev_list, int compress){
+void QuickList::setParams(_InitPs ip){
     //max_entry_ev_list: max = 1 << 15. compress >= 0
-    quicklistSetFill(m_ptr, max_entry_ev_list);
-    quicklistSetCompressDepth(m_ptr, compress);
-    m_max_entry_ev = max_entry_ev_list;
-    m_compress = compress;
+    quicklistSetFill(m_ptr, ip.max_entry_ev_list);
+    quicklistSetCompressDepth(m_ptr, ip.compress);
+    m_params = ip;
 }
 
 void QuickList::add(int index, CString data){
@@ -78,5 +95,12 @@ int QuickList::size(){
 }
 void QuickList::clear(){
     quicklistRelease(m_ptr);
-    m_ptr = quicklistNew(m_max_entry_ev, m_compress);
+    m_ptr = quicklistNew(m_params.max_entry_ev_list, m_params.compress);
+}
+void QuickList::toVector(std::vector<String>& vec){
+    int _size = size();
+    for(int i = 0; i < _size ; ++i){
+        String str = get(i);
+        vec.push_back(std::move(str));
+    }
 }
