@@ -5,12 +5,15 @@
 #include "redisassert.h"
 
 using namespace h7;
+using String = std::string;
 
 static void test_Ziplist();
 static void test_QuickList();
+
+extern void test_dna_compress();
 extern void test_JudyList();
 
-int main (int argc, char* argv[]){
+int main(int argc, char* argv[]){
     setbuf(stdout, NULL);
     //test string if copy.
 //    const char* s = "abc";
@@ -24,6 +27,7 @@ int main (int argc, char* argv[]){
     test_QuickList();
     test_JudyList();
 
+    test_dna_compress();
     return 0;
 }
 

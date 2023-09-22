@@ -2,6 +2,7 @@
 #include <Judy.h>
 #include <memory.h>
 #include <vector>
+#include <sstream>
 
 //JSLI not permit dup key.
 using namespace h7;
@@ -53,25 +54,20 @@ static inline void* _newChars(JudyList::CString c){
             }
             _size ++;
         }
-        void add(int index, JudyList::CString c){
+        void add(Word_t index, JudyList::CString c){
             //JLG;
             const int old_size = _size;
             JError_t err;
             std::vector<Word_t> posts;
             std::vector<Word_t> indexes;
             {
-                for(int i = index ; i < _size ; ++i){
-                    auto ret = JudyLGet(PJArray, i, &err);
-                    if(ret != PJERR){
-                        PWord_t PValue = (PWord_t)ret;
-                        posts.push_back(*PValue);
-                        indexes.push_back(i + 1);
-                        //JudyList::String val = *((char**)ret);
-                        //printf("val = %s\n", val.data());
-                        JudyLDel(&PJArray, i, &err);
-                    }else{
-                        J_E("JudyLGet", &err);
-                    }
+                Word_t idx = index;
+                PPvoid_t ret = JudyLGet(PJArray, idx, &err);
+                while (ret != PJERR && ret != nullptr){
+                    PWord_t PValue = (PWord_t)ret;
+                    posts.push_back(*PValue);
+                    indexes.push_back(idx + 1);
+                    ret = JudyLNext(PJArray, &idx, &err);
                 }
             }
             _add(index, c);
@@ -102,26 +98,33 @@ static inline void* _newChars(JudyList::CString c){
             }
         }
         void removeAt(int index){
+            const int old_size = _size;
             JError_t err;
             PPvoid_t ret;
             std::vector<Word_t> posts;
             std::vector<Word_t> indexes;
             {
-                for(int i = index + 1 ; i < _size ; ++i){
-                    ret = JudyLGet(PJArray, i, &err);
-                    if(ret != PJERR){
-                        PWord_t PValue = (PWord_t)ret;
-                        posts.push_back(*PValue);
-                        indexes.push_back(i - 1);
-                        JudyLDel(&PJArray, i, &err);
-                    }else{
-                        J_E("JudyLGet", &err);
-                    }
+                Word_t idx = index;
+                ret = JudyLGet(PJArray, idx, &err);
+                if(ret == PJERR || ret == NULL){
+                    return;
+                }
+                {
+                    PWord_t PValue = (PWord_t)ret;
+                    free(*(char**)PValue);
+                    JudyLDel(&PJArray, idx, &err);
+                }
+                ret = JudyLNext(PJArray, &idx, &err);
+                while (ret != PJERR && ret != NULL){
+                    PWord_t PValue = (PWord_t)ret;
+                    posts.push_back(*PValue);
+                    indexes.push_back(idx - 1);
+                    JudyLDel(&PJArray, idx, &err);
+                    ret = JudyLNext(PJArray, &idx, &err);
                 }
             }
-            JudyLDel(&PJArray, index, &err);
-            _size --;
             if(posts.size() == 0){
+                _size = old_size - 1;
                 return;
             }
             {
@@ -130,6 +133,7 @@ static inline void* _newChars(JudyList::CString c){
                     _add(indexes[i], (void*)posts[i]);
                 }
             }
+            _size = old_size - 1;
         }
         void clear(){
             JError_t err;
@@ -141,20 +145,49 @@ static inline void* _newChars(JudyList::CString c){
             PWord_t PValue;
             Word_t index = 0;
             JError_t err;
-            PValue = (PWord_t)JudyLGet(PJArray, index, &err);
+            PValue = (PWord_t)JudyLFirst(PJArray , &index, &err);
             if(PValue == PJERR){
                 return -1;
             }
-            while (PValue != NULL) {
+            while (PValue != NULL && PValue != PJERR) {
                 //JudyList::String str = *(char**)PValue;
                 //printf("str = %s\n", str.data());
                 if(strcmp(c.data(), *(char**)PValue) == 0){
                     return index;
                 }
-                index ++;
-                PValue = (PWord_t)JudyLGet(PJArray, index, &err);
+                PValue = (PWord_t)JudyLNext(PJArray , &index, &err);
             }
             return -1;
+        }
+        void print(){
+            PWord_t PValue;
+            Word_t index = 0;
+            JError_t err;
+            PValue = (PWord_t)JudyLFirst(PJArray , &index, &err);
+            if(PValue == PJERR){
+                return;
+            }
+            std::stringstream ss;
+            while (PValue != NULL) {
+                ss << *(char**)PValue;
+                PValue = (PWord_t)JudyLNext(PJArray , &index, &err);
+                if(PValue == PJERR || PValue == NULL){
+                    break;
+                }
+                ss << ", ";
+            }
+            auto str = ss.str();
+            printf("judy_print >>\n [%s]\n", str.data());
+        }
+        void toVector(std::vector<JudyList::String>& vec){
+            PWord_t PValue;
+            Word_t index = 0;
+            JError_t err;
+            PValue = (PWord_t)JudyLFirst(PJArray , &index, &err);
+            while (PValue != NULL && PValue != PJERR) {
+                vec.emplace_back(*(char**)PValue);
+                PValue = (PWord_t)JudyLNext(PJArray , &index, &err);
+            }
         }
     };
 }
@@ -195,4 +228,10 @@ void JudyList::removeAt(int index){
 }
 void JudyList::clear(){
     m_ptr->clear();
+}
+void JudyList::print(){
+    m_ptr->print();
+}
+void JudyList::toVector(std::vector<String>& vec){
+    m_ptr->toVector(vec);
 }

@@ -20,6 +20,23 @@ SET(JUDY_LIBS
     ${JUDY_DIR}/libs/libJudy.a
     )
 
+## zstd
+set(ZSTD_DIR $ENV{ZSTD_DIR})
+if(NOT DEFINED ENV{ZSTD_DIR})
+    set(ZSTD_DIR /home/heaven7/heaven7/env/linux/zstd)
+endif()
+include_directories(${ZSTD_DIR}/include)
+SET(ZSTD_LIBS
+    ${ZSTD_DIR}/libs/libzstd.a  # static for single thread. so for multi
+    )
+
+##
+set(DEP_LIBS
+    ${JUDY_LIBS}
+    ${ZSTD_LIBS}
+    z
+    )
+
 ##
 add_compile_definitions(REDIS_TEST)
 
@@ -51,9 +68,11 @@ add_library(redis
     h7_redis.hpp
     )
 
-file(GLOB_RECURSE SRC_H7_TEST  h7/*.cpp h7/*.h h7/*.hpp)
+#
+
+file(GLOB_RECURSE SRC_H7_TEST  h7/*.cpp h7/*.h h7/*.c h7/*.hpp)
 
 add_executable(test_redis
     ${SRC_H7_TEST}
     )
-target_link_libraries(test_redis PUBLIC redis ${JUDY_LIBS})
+target_link_libraries(test_redis PUBLIC redis ${DEP_LIBS})

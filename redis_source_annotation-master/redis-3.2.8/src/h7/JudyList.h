@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <string>
+#include <vector>
 
 namespace h7 {
 
@@ -29,8 +30,14 @@ public:
     bool contains(CString data){
         return indexOf(data) >= 0;
     }
+    void toVector(std::vector<String>& vec);
+    std::vector<String> toVector(){
+        std::vector<String> vec;
+        toVector(vec);
+        return vec;
+    }
 
-
+    void print();
 private:
     _JudyList_ctx* m_ptr{nullptr};
 };
