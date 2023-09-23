@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace h7 {
 
@@ -19,7 +20,8 @@ struct Read{
     int lastChar;
 
     String toString();
-    void fromString(CString str);
+    String nonSeqToString();
+    //void fromNonSeqString(CString str);
 };
 
 class ReadReader{
@@ -39,6 +41,12 @@ public:
 
 class ReadWriter{
 public:
+    struct Params{
+        //0 means default
+        int compress_method {0};
+        int dna_compress_method {0};
+    };
+    virtual void setParams(const Params&) = 0;
     virtual void begin() = 0;
     virtual bool write(Read* r) = 0;
     virtual void end() = 0;
@@ -59,8 +67,9 @@ private:
 typedef struct _ReadWriter_HMZ_ctx _ReadWriter_HMZ_ctx;
 class ReadWriter_HMZ: public ReadWriter{
 public:
-    ReadWriter_HMZ(CString file, unsigned long long max_block_size = 0);
+    ReadWriter_HMZ(CString file, unsigned int max_read_count = 100000);
     ~ReadWriter_HMZ();
+    void setParams(const Params&) override;
     void begin() override;
     bool write(Read* r) override;
     void end() override;

@@ -11,6 +11,8 @@
 #include "FileIO.h"
 #include "hash.h"
 #include "CompressManager.h"
+#include "DNACompressManager.h"
+#include "ByteBufferIO.h"
 
 #include "kseq.h"
 KSEQ_INIT(gzFile, gzread)
@@ -71,39 +73,84 @@ bool ReadReader_GZ::nextRead(Read* r){
 }
 //------------------------------------------
 //head. blocks
-//head: {fix(8), compress_method(4), block_count(4)}
-//block: {read_count(4), hash(8), data_size(8-after_compress), data_str(N)}
+//head: {fix(8), compress_method(2), dna_compress_method(2), block_count(4)}
+//block: {hash(8), read_count(4), len_names(4 * read_count), len_seqs(4 * read_count),
+//                                  seq_data_size(8-after_compress), seq_data_str(N),
+//                                  non_seq_data_size(8-after_compress), non_seq_data_str(N)}
 namespace h7 {
 
 #define _HMZ "mheavenz"
 #define _HASH_DEFAULT 23
-#define _COMP_METHOD kCompress_ZSTD
+
+using CompressParams = ReadWriter_HMZ::Params;
+using ListI = std::vector<int>;
+using ListS = std::vector<String>;
+
 struct _BlockItem{
-    uint64 hash;
-    uint32 read_rc;
-    String compressedData;
+    CompressParams* m_params;
+    uint64 hash {_HASH_DEFAULT};
+    uint32 read_count {0};
+    ListI len_names;
+    ListI len_seqs;
+    String seqStrs;
+    String nonSeqStrs;
+
+    _BlockItem(CompressParams* p): m_params(p){}
+
+    String compress(){
+        ByteBufferOut bos;
+        {
+        String seqCodes;
+        auto len = getDnaCompressor()->compress(seqStrs.data(), seqStrs.length(), &seqCodes);
+        ASSERT(len > 0, "_BlockItem >> dna compress failed.");
+        bos.prepareBuffer(seqStrs.length());
+        bos.putULong(hash);
+        bos.putUInt(read_count);
+        bos.putListInt(len_names);
+        bos.putListInt(len_seqs);
+        bos.putString64(seqCodes);
+        }
+        String out;
+        auto ret = getCompressor()->compress(nonSeqStrs.data(), nonSeqStrs.length(), &out);
+        ASSERT(ret > 0, "_BlockItem >> compress failed !");
+        bos.putString64(out);
+        return bos.bufferToString();
+    }
+    std::shared_ptr<Compressor> getCompressor(){
+        return CompressManager::get()->getCompressor(m_params->compress_method);
+    }
+    std::shared_ptr<Compressor> getDnaCompressor(){
+        return DNACompressManager::get()->getCompressor(m_params->dna_compress_method);
+    }
 };
+using SpBlockItem = std::shared_ptr<_BlockItem>;
+
+//compress by diff category, like quality,name,last_char.   seqs
 struct _ReadWriter_HMZ_ctx{
     BufferFileOutput* fos{nullptr};
-    uint32 m_read_count {0};
-    uint64 m_hash {_HASH_DEFAULT};
-    String m_content;
-    std::vector<_BlockItem> m_items;
+    uint32 m_max_read_count {0};
+    uint32 m_block_count {0};
+    SpBlockItem m_curItem;
 
-    BufferFileOutput::Func_Buffer m_func = [this](char* data, uint64 size){
-        m_hash = fasthash64(data, size, m_hash);
-        m_content += String(data, size);
-        return true;
-    };
+    CompressParams m_params;
 
-    _ReadWriter_HMZ_ctx(unsigned long long max_block_size){
-        fos = new BufferFileOutput(max_block_size);
+    _ReadWriter_HMZ_ctx(unsigned int max_read_count):m_max_read_count(max_read_count){
+        m_params.compress_method = kCompress_ZSTD;
+        m_params.dna_compress_method = kDNA_COMPRESS_HUFFMAN;
+        uint64 max = ~0;
     }
     ~_ReadWriter_HMZ_ctx(){
         close();
     }
+    CompressParams* getParams(){
+        return &m_params;
+    }
+    SpBlockItem getCurItem(){
+        return m_curItem;
+    }
     bool open(CString file){
         close();
+        fos = new BufferFileOutput(m_max_read_count);
         fos->open(file);
         return fos->is_open();
     }
@@ -115,93 +162,74 @@ struct _ReadWriter_HMZ_ctx{
         }
     }
     void begin(){
-        auto method = std::to_string(_COMP_METHOD);
-        switch (method.length()) {
-        case 1:
-            method = "000" + method;
-            break;
-        case 2:
-            method = "00" + method;
-            break;
-        case 3:
-            method = "0" + method;
-            break;
-        case 4:
-            break;
-        default:
-            ASSERT(false, "compress method error.");
-        }
-        String str(_HMZ);
-        str += method;
-        str += "0000";
-        ASSERT(str.length() == 16, "");
+        //write head
+        ByteBufferOut bos;
+        bos.prepareBuffer(16);
+        bos.setBufferAutoInc(false);
+        bos.putRawString(_HMZ);
+        bos.putUShort((uint16)m_params.compress_method);
+        bos.putUShort((uint16)m_params.dna_compress_method);
+        bos.putUInt(0);
+
+        auto str = bos.bufferToString();
+        ASSERT(str.length() == 16, "head must be 16.");
         fos->fWrite(str);
         fos->fFlush();
     }
     bool write(Read* r){
-        String _str = r->toString();
-        //length + data.
-        String str = std::to_string(_str.length()) + _str;
-        if(!fos->write(str, m_func, &m_read_count)){
-           // LOGE("write read failed.\n");
-            return false;
+        ASSERT(r->seq.length() == r->qual.length(), "must seq.len == qual.len.");
+        auto curItem = getCurItem();
+        if(!curItem){
+            curItem = m_curItem = std::make_shared<_BlockItem>(&m_params);
+            m_block_count ++;
         }
-        _performWriteContent();
+        curItem->hash = fasthash64(r->seq.data(), r->seq.length(), m_curItem->hash);
+        curItem->read_count ++;
+        curItem->len_names.push_back(r->name.length());
+        curItem->len_seqs.push_back(r->seq.length());
+        curItem->seqStrs.append(r->seq);
+        curItem->nonSeqStrs.append(r->nonSeqToString());
+        if(curItem->read_count >= m_max_read_count){
+            auto str = curItem->compress();
+            ASSERT(fos->fWrite(str.data(), str.length()), "write >> write block failed");
+            fos->fFlush();
+            m_curItem = nullptr;
+        }
         return true;
     }
     void end(){
         //write left content
-        ASSERT(fos->flush(m_func, &m_read_count), "flush failed");
-        _performWriteContent();
-        fos->fFlush();
+        auto curItem = getCurItem();
+        if(curItem){
+            auto str = curItem->compress();
+            ASSERT(fos->fWrite(str.data(), str.length()), "end >>write block failed");
+            fos->fFlush();
+            m_curItem = nullptr;
+        }
         //write block count
         fos->seek(12);
-        uint32 blockCount = m_items.size();
-        fos->fWrite(&blockCount, sizeof(blockCount));
+        fos->fWrite(&m_block_count, sizeof(m_block_count));
         fos->fFlush();
-    }
-    void _performWriteContent(){
-        if(m_read_count > 0){
-            auto cm = CompressManager::get()->getCompressor(_COMP_METHOD);
-            ASSERT(cm, "can't find compressor, you should call reg(%d,...).",
-                   _COMP_METHOD);
-            String out;
-            {
-                auto out_len = cm->compress(m_content.data(), m_content.length(), &out);
-                if(out_len <= 0){
-                    ASSERT(false, "compress failed");
-                }
-            }
-            {
-                _BlockItem item;
-                item.read_rc = m_read_count;
-                item.hash = m_hash;
-                m_items.push_back(std::move(item));
-            }
-            //write
-            fos->fWrite(&m_read_count, sizeof (m_read_count));
-            fos->fWrite(&m_hash, sizeof(m_hash));
-            uint64 ds = out.length();
-            fos->fWrite(&ds, sizeof(ds));
-            fos->fWrite(out.data(), out.length());
-            {
-                m_content.clear();
-                m_hash = _HASH_DEFAULT;
-                m_read_count = 0;
-            }
-        }
     }
 };
 }
 
-ReadWriter_HMZ::ReadWriter_HMZ(CString file, unsigned long long max_block_size){
-    m_ptr = new _ReadWriter_HMZ_ctx(max_block_size);
+ReadWriter_HMZ::ReadWriter_HMZ(CString file, unsigned int max_read_count){
+    m_ptr = new _ReadWriter_HMZ_ctx(max_read_count);
     ASSERT(m_ptr->open(file), "open file faild. %s", file.data());
 }
 ReadWriter_HMZ::~ReadWriter_HMZ(){
     if(m_ptr){
         delete m_ptr;
         m_ptr = nullptr;
+    }
+}
+void ReadWriter_HMZ::setParams(const Params& p){
+    if(p.compress_method > 0){
+        m_ptr->m_params.compress_method = p.compress_method;
+    }
+    if(p.dna_compress_method > 0){
+        m_ptr->m_params.dna_compress_method = p.dna_compress_method;
     }
 }
 void ReadWriter_HMZ::begin(){
@@ -213,44 +241,40 @@ bool ReadWriter_HMZ::write(Read* r){
 void ReadWriter_HMZ::end(){
     m_ptr->end();
 }
+//-------------------------------------------
+struct _ReadReader_HMZ_ctx{
+
+};
+ReadReader_HMZ::ReadReader_HMZ(CString file){
+
+}
+ReadReader_HMZ::~ReadReader_HMZ(){
+
+}
+bool ReadReader_HMZ::nextRead(Read* r){
+
+}
 
 
 //--------------------------------------------
-static std::map<char, int> _sIndexMap = {
-    {'N', 10000},
-    {'A', 01000},
-    {'C', 00100},
-    {'T', 00010},
-    {'G', 00001},
-};
-static inline int _GetFlag(char ch){
-    auto it = _sIndexMap.find(ch);
-    if(it != _sIndexMap.end()){
-        return it->second;
-    }
-    return _sIndexMap['N'];
-}
 //NACTG 11111
 //XXXX -> 1111
 String Read::toString(){
     std::stringstream ss;
-    ss << (uint16)name.length();
-    ss << name;
-    ss << (uint32)qual.length();
-    ss << qual;
+    ss << "{name=";
+    ss << name << ", ";
+    ss << "seq=";
+    ss << seq << ", ";
+    ss << "qual=";
+    ss << qual << ", ";
     ss << (char)lastChar;
-    char* chs = seq.data();
-    uint32 len = seq.length();
-    int left = len % 5;
-    char buf_chs[5];
-    for(uint32 i = 0 ; i < len - 5 ; i += 5){
-        //buf_chs[i] =
-        _GetFlag(buf_chs[i]);
-    }
+    ss << "}";
+    return ss.str();
 }
-void Read::fromString(CString str){
+String Read::nonSeqToString(){
+    return name + qual + String(1, (char)lastChar);
+}
 
-}
 Fastqs::Fastqs()
 {
 

@@ -4,12 +4,6 @@
 
 namespace h7 {
 
-enum {
-    kDNA_COMPRESS_HUFFMAN = 1,
-    kDNA_COMPRESS_RLE     = 2,
-    kDNA_COMPRESS_INDEX   = 3,
-};
-
 class DNACompressManager
 {
 public:

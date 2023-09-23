@@ -6,17 +6,14 @@
 #include <memory>
 #include <mutex>
 
-namespace h7 {
+#include "compress_ctx.h"
 
-enum{
-    kCompress_SNAP = 1,
-    kCompress_ZSTD,
-};
+namespace h7 {
 
 struct Compressor{
     ~Compressor(){};
-    virtual uint64 compress(void* data, uint64 len, String* out) = 0;
-    virtual uint64 deCompress(void* data, uint64 len, String* out) = 0;
+    virtual uint64 compress(const void* data, uint64 len, String* out) = 0;
+    virtual uint64 deCompress(const void* data, uint64 len, String* out) = 0;
 };
 
 class CompressManager

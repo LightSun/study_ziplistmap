@@ -28,14 +28,14 @@ struct ZSTD_CM: public Compressor{
             dctx = nullptr;
         }
     }
-    uint64 compress(void* data, uint64 len, String* out) override{
+    uint64 compress(const void* data, uint64 len, String* out) override{
         out->resize(len);
         auto out_size = ZSTD_compressCCtx(cctx, out->data(), len, data,
                                           len, ZSTD_defaultCLevel());
         ASSERT(ZSTD_isError(out_size), "ZSTD_compressCCtx failed.");
         return out_size;
     }
-    uint64 deCompress(void* data, uint64 len, String* out) override{
+    uint64 deCompress(const void* data, uint64 len, String* out) override{
         out->resize(len);
         auto out_size = ZSTD_decompressDCtx(dctx, out->data(), len, data, len);
         ASSERT(ZSTD_isError(out_size), "ZSTD_decompressDCtx failed.");
@@ -48,6 +48,5 @@ CompressManager* CompressManager::get(){
     return &cm;
 }
 void CompressManager::regAll(){
-    std::shared_ptr<Compressor> cmp = std::make_shared<ZSTD_CM>();
-    get()->reg(kCompress_ZSTD, cmp);
+    get()->reg(kCompress_ZSTD, std::make_shared<ZSTD_CM>());
 }

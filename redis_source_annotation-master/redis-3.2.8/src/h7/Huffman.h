@@ -6,9 +6,7 @@
 #include <memory.h>
 #include <string.h>
 
-#include "common.h"
-#include "c_common.h"
-#include "_utils.h"
+#include "ByteBufferIO.h"
 
 namespace h7 {
 
@@ -31,71 +29,60 @@ public:
     };
 
 public:
+    std::string rawCompress(const std::string& input, std::unordered_map<char, int>& out){
+         auto str = _compress(input);
+         out = m_frequencies;
+         return str;
+    }
+
+    std::string rawDecompress(const std::string& input, const std::unordered_map<char, int>& out){
+         m_frequencies = out;
+         return _decompress(input);
+    }
+
     std::string compress(const std::string& input){
         auto str = _compress(input);
-        const uint32 str_len = str.length();
-
         auto fstr = _encodeFrequencies();
-        //encode binary to oct
-        std::vector<int> vec_str;
-        {
-            //align 32
-            int left = 32 - str_len % 32;
-            str.reserve(str_len + left);
-            for(int i = 0 ; i < left ; ++i){
-                str += "0";
-            }
-            int size = str_len >> 5; // x/32
-            auto _data = str.data();
-            vec_str.resize(size);
-            for(int i = 0 ; i < size ; ++i){
-                vec_str[i] = h7::binaryStr2Dec(_data + (i << 5), 32);
-            }
-        }
-        //str_len + vec_str.length + int_datas
-        std::vector<char> str_data;
-        str_data.resize(sizeof(uint32) + sizeof(uint32)
-                        + vec_str.size() *sizeof(uint32));
-        {
-            //set data
-            uint32 offset = 0;
-            memcpy(str_data.data(), &str_len, sizeof (uint32));
-            offset += sizeof (uint32);
-            uint32 vec_len = vec_str.size();
-            memcpy(str_data.data() + offset, &vec_len, sizeof (uint32));
-            offset += sizeof (uint32);
-            //
-            memcpy(str_data.data() + offset, vec_str.data(),
-                   sizeof(uint32) * vec_len);
-        }
-        return fstr + String(str_data.data(), str_data.size());
+        //
+        ByteBufferOut bout;
+        bout.putString16(fstr);
+        bout.putBinaryStringAsInts(str);
+
+        return bout.bufferToString();
     }
     std::string decompress(const std::string& input){
-        //TODO
+        ByteBufferIO bio((String*)&input);
+        auto fstr = bio.getString16();
+        _decodeFrequencies(fstr);
+        auto str = bio.getBinaryStringFromInts();
+        return _decompress(str);
     }
 
 private:
+    void _decodeFrequencies(CString input){
+        m_frequencies.clear();
+        ByteBufferIO bio((String*)&input);
+        auto size = bio.getInt();
+        for(int i = 0 ; i < size ; ++i){
+            char key = bio.getByte();
+            int val = bio.getInt();
+            m_frequencies[key] = val;
+        }
+    }
     std::string _encodeFrequencies(){
         const int size = m_frequencies.size();
         ASSERT(size <= 4, "have special char. only permit ATCG.");
         //size, data
-        std::string str;
-        str.resize(sizeof (int) + size * (sizeof (char) + sizeof (int)));
-        char* ptr_data = str.data();
-        memcpy(ptr_data, &size, sizeof (int));
+        ByteBufferOut bout;
+        bout.prepareBuffer(64);
+        bout.putInt(size);
         //
-        size_t offset = sizeof (int);
         auto it = m_frequencies.begin();
         for(; it != m_frequencies.end(); ++it){
-            char key = it->first;
-            int val = it->second;
-            memcpy(ptr_data + offset, &key, sizeof (char));
-            offset += sizeof (char);
-
-            memcpy(ptr_data + offset, &val, sizeof (int));
-            offset += sizeof (int);
+            bout.putByte(it->first);
+            bout.putInt(it->second);
         }
-        return str;
+        return bout.bufferToString();
     }
     std::string _compress(const std::string& input) {
         if (input.empty()) {
