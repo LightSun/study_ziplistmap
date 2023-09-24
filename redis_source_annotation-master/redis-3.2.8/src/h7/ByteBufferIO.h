@@ -80,27 +80,34 @@ namespace h7 {
             //encode binary to oct
             std::vector<int> vec_str;
             {
-                int left = 32 - str_len % 32;
-                //LOGE("putBinaryStringAsInts >> binStr.len=%u, left = %d\n", binStr.length(), left);
-                if(left != 32){
-                    str.reserve(str_len + left);
-                    uint64 start_pos = (str_len / 32) * 32;
-                    auto post_str = str.substr(start_pos);
-                    String newStr = str.substr(0, start_pos);
-                    for(int i = 0 ; i < left ; i++){
-                        post_str = "0" + post_str;
-                    }
-                    str = newStr + post_str;
-                }
-                ASSERT(str.length() % 32 == 0, "must str.length() % 32 == 0");
-                int size = str.length() >> 5; // x/32
                 auto _data = str.data();
+                int left = 32 - str_len % 32;
+                const bool needHandle = left != 32;
+                int size = str_len / 32 + (needHandle ? 1 : 0);
                 vec_str.resize(size);
-                for(int i = 0 ; i < size ; ++i){
-                    vec_str[i] = h7::binaryStr2Dec(_data + (i << 5), 32);
-                    //String tstr(_data + (i << 5), 32);
-                    //LOGE("binaryStr2Dec >> str= %s, int = %d\n", tstr.data(), vec_str[i]);
+                for(uint64 i = 0 ; i < size ; i ++ ){
+                    if(i == size - 1 && needHandle){
+                        vec_str[i] = h7::binaryStr2Dec(_data + (i << 5), str_len % 32);
+                    }else{
+                        vec_str[i] = h7::binaryStr2Dec(_data + (i << 5), 32);
+                    }
                 }
+//                if(left != 32){
+//                    str.reserve(str_len + left);
+//                    uint64 start_pos = (str_len / 32) * 32;
+//                    auto post_str = str.substr(start_pos);
+//                    String newStr = str.substr(0, start_pos);
+//                    for(int i = 0 ; i < left ; i++){
+//                        post_str = "0" + post_str;
+//                    }
+//                    str = newStr + post_str;
+//                }
+//                ASSERT(str.length() % 32 == 0, "must str.length() % 32 == 0");
+//                int size = str.length() >> 5; // x/32
+//                vec_str.resize(size);
+//                for(int i = 0 ; i < size ; ++i){
+//                    vec_str[i] = h7::binaryStr2Dec(_data + (i << 5), 32);
+//                }
             }
             uint64 data_size = vec_str.size() * sizeof (int);
             prepareBufferIncIfNeed(sizeof (uint32) * 2 + data_size);
