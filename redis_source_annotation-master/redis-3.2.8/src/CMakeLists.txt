@@ -12,23 +12,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(JUDY_DIR $ENV{JUDY_DIR})
 if(NOT DEFINED ENV{JUDY_DIR})
-    set(JUDY_DIR /home/heaven7/heaven7/env/linux/judy)
+    if(CMAKE_HOST_WIN32)
+        set(JUDY_DIR D:/study/cpp/ENV/judy)
+    else()
+        set(JUDY_DIR /home/heaven7/heaven7/env/linux/judy)
+    endif()
 endif()
 include_directories(${JUDY_DIR}/include)
 SET(JUDY_LIBS
-    #${JUDY_DIR}/libs/libJudy1.a
     ${JUDY_DIR}/libs/libJudy.a
     )
 
 ## zstd
-set(ZSTD_DIR $ENV{ZSTD_DIR})
-if(NOT DEFINED ENV{ZSTD_DIR})
-    set(ZSTD_DIR /home/heaven7/heaven7/env/linux/zstd)
+SET(ZSTD_LIBS)
+if(CMAKE_HOST_WIN32)
+    # mingw
+    SET(ZSTD_LIBS zstd)
+else(CMAKE_HOST_WIN32)
+    set(ZSTD_DIR $ENV{ZSTD_DIR})
+    if(NOT DEFINED ENV{ZSTD_DIR})
+        set(ZSTD_DIR /home/heaven7/heaven7/env/linux/zstd)
+    endif()
+    include_directories(${ZSTD_DIR}/include)
+    SET(ZSTD_LIBS
+        ${ZSTD_DIR}/libs/libzstd.a  # static for single thread. so for multi
+        )
 endif()
-include_directories(${ZSTD_DIR}/include)
-SET(ZSTD_LIBS
-    ${ZSTD_DIR}/libs/libzstd.a  # static for single thread. so for multi
-    )
 
 ##
 set(DEP_LIBS

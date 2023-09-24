@@ -111,9 +111,15 @@ static int random_level(void)
 {
         int level = 1;
         const double p = 0.25;
+#if _WIN32
+        while ((rand() & 0xffff) < 0xffff * p) {
+                level++;
+        }
+#else
         while ((random() & 0xffff) < 0xffff * p) {
                 level++;
         }
+#endif
         return level > MAX_LEVEL ? MAX_LEVEL : level;
 }
 

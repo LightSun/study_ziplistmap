@@ -12,6 +12,8 @@ static void test_QuickList();
 
 extern void test_dna_compress();
 extern void test_JudyList();
+extern void test_compressor();
+extern void test_buffer_io();
 
 int main(int argc, char* argv[]){
     setbuf(stdout, NULL);
@@ -25,9 +27,12 @@ int main(int argc, char* argv[]){
 
     test_Ziplist();
     test_QuickList();
-    test_JudyList();
+    //judy array on windows have bug.
+    //test_JudyList();
 
-    test_dna_compress();
+    test_buffer_io();
+    //test_dna_compress();
+    //test_compressor();
     return 0;
 }
 

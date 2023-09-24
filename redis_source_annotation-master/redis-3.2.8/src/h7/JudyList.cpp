@@ -3,6 +3,7 @@
 #include <memory.h>
 #include <vector>
 #include <sstream>
+#include <string.h>
 
 //JSLI not permit dup key.
 using namespace h7;

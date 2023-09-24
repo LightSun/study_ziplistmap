@@ -16,30 +16,37 @@ static inline int binaryStr2Dec(const char* str, int size)
     return ret;
 }
 
-static inline std::string decToBinaryString(int n, bool align32){
-    int binaryNum[32];
+static inline std::string decToBinaryString(int decimalNum, bool align32){
+    std::string binaryStr;
 
-    int i = 0;
-    while (n > 0) {
-        binaryNum[i] = n % 2;
-        n = n / 2;
-        i++;
-    }
-    std::string str;
-    // printing binary array in reverse order
-    for (int j = i - 1; j >= 0; j--){
-        str += std::to_string(binaryNum[j]);
-    }
-    if(align32){
-        int left = 32 - str.length();
-        if(left > 0){
-            str.reserve(str.length() + left);
-            for(int i = 0 ;i < left; ++i){
-               str = "0" + str;
+    if (decimalNum < 0) {
+        // negative
+        unsigned int uDecimalNum = static_cast<unsigned int>(decimalNum); //to unsigned int
+        while (uDecimalNum > 0) {
+            binaryStr = (uDecimalNum % 2 == 0 ? "0" : "1") + binaryStr;
+            uDecimalNum /= 2;
+        }
+    } else {
+        // positive
+        if (decimalNum == 0) {
+            binaryStr = "0";
+        } else {
+            while (decimalNum > 0) {
+                binaryStr = (decimalNum % 2 == 0 ? "0" : "1") + binaryStr;
+                decimalNum /= 2;
             }
         }
     }
-    return str;
+    if(align32){
+        int left = 32 - binaryStr.length();
+        if(left > 0){
+            binaryStr.reserve(binaryStr.length() + left);
+            for(int i = 0 ;i < left; ++i){
+               binaryStr = "0" + binaryStr;
+            }
+        }
+    }
+    return binaryStr;
 }
 
 }

@@ -39,6 +39,9 @@ DNACompressManager* DNACompressManager::get(){
 
 void DNACompressManager::regAll(){
     //
+    if(get()->m_map.size() > 0){
+        return;
+    }
     get()->reg(kDNA_COMPRESS_HUFFMAN, std::make_shared<HuffmanCompressor>());
 }
 

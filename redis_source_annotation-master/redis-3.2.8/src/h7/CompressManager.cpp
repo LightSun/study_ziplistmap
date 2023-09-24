@@ -1,45 +1,27 @@
 #include "CompressManager.h"
-#include "zstd.h"
 #include "common.h"
+#include "ZstdUtil.h"
 
 using namespace h7;
 
 
 struct ZSTD_CM: public Compressor{
 
-    ZSTD_CCtx* cctx {nullptr};
-    ZSTD_DCtx* dctx {nullptr};
-
-    ZSTD_CM(){
-        cctx = ZSTD_createCCtx();
-        auto ret = ZSTD_CCtx_setParameter(cctx, ZSTD_c_strategy, ZSTD_btultra);
-        ASSERT(ZSTD_isError(ret), "ZSTD_CCtx_setParameter failed.");
-
-        dctx = ZSTD_createDCtx();
-        ASSERT(dctx, "ZSTD_createDCtx failed.");
+    uint64 compress(CString in, String* out) override{
+        ZstdUtil::StreamCompressString(in, *out, ZSTD_defaultCLevel());
+        return out->length();
     }
-    ~ZSTD_CM(){
-        if(cctx){
-            ZSTD_freeCCtx(cctx);
-            cctx = nullptr;
+    uint64 deCompress(CString in, String* out) override{
+        if(ZstdUtil::StreamDecompressString(in, *out) == 0){
+            return out->length();
         }
-        if(dctx){
-            ZSTD_freeDCtx(dctx);
-            dctx = nullptr;
-        }
+        return 0;
     }
     uint64 compress(const void* data, uint64 len, String* out) override{
-        out->resize(len);
-        auto out_size = ZSTD_compressCCtx(cctx, out->data(), len, data,
-                                          len, ZSTD_defaultCLevel());
-        ASSERT(ZSTD_isError(out_size), "ZSTD_compressCCtx failed.");
-        return out_size;
+        return compress(String((char*)data, len), out);
     }
     uint64 deCompress(const void* data, uint64 len, String* out) override{
-        out->resize(len);
-        auto out_size = ZSTD_decompressDCtx(dctx, out->data(), len, data, len);
-        ASSERT(ZSTD_isError(out_size), "ZSTD_decompressDCtx failed.");
-        return out_size;
+        return deCompress(String((char*)data, len), out);
     }
 };
 
@@ -48,5 +30,8 @@ CompressManager* CompressManager::get(){
     return &cm;
 }
 void CompressManager::regAll(){
+    if(get()->m_map.size() > 0){
+        return;
+    }
     get()->reg(kCompress_ZSTD, std::make_shared<ZSTD_CM>());
 }
