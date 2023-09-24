@@ -6,6 +6,7 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <list>
 
 #include "common.h"
 #include "FileIO.h"
@@ -97,11 +98,57 @@ struct _BlockItem{
 
     _BlockItem(CompressParams* p): m_params(p){}
 
+    void toReads(std::list<Read>& out){
+        uint64 offset_seq = 0;
+        uint64 offset_nonseq = 0;
+        for(int i = 0 ; i < read_count; ++i){
+            int& len_name = len_names[i];
+            int& len_seq = len_seqs[i];
+            Read r;
+            r.seq = seqStrs.substr(offset_seq, len_seq);
+            offset_seq += r.seq.length();
+            //
+            r.name = nonSeqStrs.substr(offset_nonseq, len_name);
+            offset_nonseq += r.name.length();
+            r.qual = nonSeqStrs.substr(offset_nonseq, len_seq);
+            offset_nonseq += r.qual.length();
+            r.lastChar = nonSeqStrs.data()[offset_nonseq];
+            offset_nonseq += 1;
+            out.push_back(std::move(r));
+        }
+    }
+    void addRead(Read* r){
+        hash = fasthash64(r->seq.data(), r->seq.length(), hash);
+        read_count ++;
+        len_names.push_back(r->name.length());
+        len_seqs.push_back(r->seq.length());
+        seqStrs.append(r->seq);
+        nonSeqStrs.append(r->nonSeqToString());
+    }
+
+    void decompress(CString in){
+        ByteBufferIO bis((String*)&in);
+        hash = bis.getULong();
+        read_count = bis.getUInt();
+        bis.getListInt(len_names);
+        bis.getListInt(len_seqs);
+        {
+        String seqCodes = bis.getString64();
+        auto len = getDnaCompressor()->deCompress(seqCodes, &seqStrs);
+        ASSERT(len > 0, "_BlockItem >> dna deCompress failed.");
+        }
+
+        {
+        String nonSeqs_de = bis.getString64();
+        auto ret = getCompressor()->deCompress(nonSeqs_de, &nonSeqStrs);
+        ASSERT(ret > 0, "_BlockItem >> deCompress failed !");
+        }
+    }
     String compress(){
         ByteBufferOut bos;
         {
         String seqCodes;
-        auto len = getDnaCompressor()->compress(seqStrs.data(), seqStrs.length(), &seqCodes);
+        auto len = getDnaCompressor()->compress(seqStrs, &seqCodes);
         ASSERT(len > 0, "_BlockItem >> dna compress failed.");
         bos.prepareBuffer(seqStrs.length());
         bos.putULong(hash);
@@ -111,7 +158,7 @@ struct _BlockItem{
         bos.putString64(seqCodes);
         }
         String out;
-        auto ret = getCompressor()->compress(nonSeqStrs.data(), nonSeqStrs.length(), &out);
+        auto ret = getCompressor()->compress(nonSeqStrs, &out);
         ASSERT(ret > 0, "_BlockItem >> compress failed !");
         bos.putString64(out);
         return bos.bufferToString();
@@ -183,17 +230,10 @@ struct _ReadWriter_HMZ_ctx{
             curItem = m_curItem = std::make_shared<_BlockItem>(&m_params);
             m_block_count ++;
         }
-        curItem->hash = fasthash64(r->seq.data(), r->seq.length(), m_curItem->hash);
-        curItem->read_count ++;
-        curItem->len_names.push_back(r->name.length());
-        curItem->len_seqs.push_back(r->seq.length());
-        curItem->seqStrs.append(r->seq);
-        curItem->nonSeqStrs.append(r->nonSeqToString());
+        curItem->addRead(r);
+
         if(curItem->read_count >= m_max_read_count){
-            auto str = curItem->compress();
-            ASSERT(fos->fWrite(str.data(), str.length()), "write >> write block failed");
-            fos->fFlush();
-            m_curItem = nullptr;
+            _writeItem(curItem);
         }
         return true;
     }
@@ -201,15 +241,20 @@ struct _ReadWriter_HMZ_ctx{
         //write left content
         auto curItem = getCurItem();
         if(curItem){
-            auto str = curItem->compress();
-            ASSERT(fos->fWrite(str.data(), str.length()), "end >>write block failed");
-            fos->fFlush();
-            m_curItem = nullptr;
+            _writeItem(curItem);
         }
         //write block count
         fos->seek(12);
         fos->fWrite(&m_block_count, sizeof(m_block_count));
         fos->fFlush();
+    }
+    void _writeItem(SpBlockItem curItem){
+        auto str = curItem->compress();
+        uint64 len = str.length();
+        ASSERT(fos->fWrite(&len, sizeof(len)), "write >> write block_len failed");
+        ASSERT(fos->fWrite(str.data(), str.length()), "end >>write block failed");
+        fos->fFlush();
+        m_curItem = nullptr;
     }
 };
 }
@@ -242,17 +287,55 @@ void ReadWriter_HMZ::end(){
     m_ptr->end();
 }
 //-------------------------------------------
+namespace h7 {
 struct _ReadReader_HMZ_ctx{
 
-};
-ReadReader_HMZ::ReadReader_HMZ(CString file){
+    FileInput fis;
+    CompressParams m_params;
+    uint32 m_block_count {0};
+    uint32 m_dec_block_count {0};
+    std::list<Read> m_reads;
 
+    _ReadReader_HMZ_ctx(CString file){
+        fis.open(file);
+        ASSERT(fis.is_open(), "open file failed: %s", file.data());
+        auto head = fis.read(16);
+        ByteBufferIO bis(&head);
+        ASSERT(bis.getRawString(8) == _HMZ, "read failed by file format error.");
+        m_params.compress_method = bis.getUShort();
+        m_params.dna_compress_method = bis.getUShort();
+        m_block_count = bis.getUInt();
+    }
+
+    bool nextRead(Read* r){
+        if(m_reads.empty()){
+            if(m_dec_block_count >= m_block_count){
+                return false;
+            }
+            auto bl = fis.readLong();
+            auto str = fis.read(bl);
+            _BlockItem bi(&m_params);
+            bi.decompress(str);
+            bi.toReads(m_reads);
+            m_dec_block_count ++;
+        }
+        *r = m_reads.front();
+        m_reads.pop_front();
+        return true;
+    }
+};
+}
+ReadReader_HMZ::ReadReader_HMZ(CString file){
+    m_ptr = new _ReadReader_HMZ_ctx(file);
 }
 ReadReader_HMZ::~ReadReader_HMZ(){
-
+    if(m_ptr){
+        delete m_ptr;
+        m_ptr = nullptr;
+    }
 }
 bool ReadReader_HMZ::nextRead(Read* r){
-
+    return m_ptr->nextRead(r);
 }
 
 

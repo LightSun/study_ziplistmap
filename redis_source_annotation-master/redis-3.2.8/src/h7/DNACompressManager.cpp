@@ -9,6 +9,17 @@ struct HuffmanCompressor : public Compressor{
 
     }
     ~HuffmanCompressor(){};
+    uint64 compress(CString in, String* out) override{
+        //avoid memory copy
+        Huffman huffman;
+        *out = huffman.compress(in);
+        return out->length();
+    }
+    uint64 deCompress(CString in, String* out) override{
+        Huffman huffman;
+        *out = huffman.decompress(in);
+        return out->length();
+    }
     uint64 compress(const void* data, uint64 len, String* out) override{
         Huffman huffman;
         *out = huffman.compress(String((char*)data, len));

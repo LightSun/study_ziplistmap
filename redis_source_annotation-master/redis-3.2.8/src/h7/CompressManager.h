@@ -12,6 +12,13 @@ namespace h7 {
 
 struct Compressor{
     ~Compressor(){};
+
+    virtual uint64 compress(CString in, String* out){
+        return compress(in.data(), in.length(), out);
+    }
+    virtual uint64 deCompress(CString in, String* out){
+        return deCompress(in.data(), in.length(), out);
+    }
     virtual uint64 compress(const void* data, uint64 len, String* out) = 0;
     virtual uint64 deCompress(const void* data, uint64 len, String* out) = 0;
 };

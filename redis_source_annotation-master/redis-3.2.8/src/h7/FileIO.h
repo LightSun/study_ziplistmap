@@ -52,13 +52,20 @@ namespace h7 {
                 return -1;
             return fread(data, 1, len, m_file);
         }
-
+        sint64 readLong(sint64 def = -1){
+            sint64 len = 0;
+            if(fread(&len, 1, sizeof (sint64), m_file)){
+                return len;
+            }
+            return def;
+        }
         String read(uint64 len){
             ASSERT(len > 0, "");
             if(m_file != nullptr){
                 std::vector<char> vec(len, 0);
-                fread(vec.data(), 1, len, m_file);
-                return String(vec.data(), len);
+                if(fread(vec.data(), 1, len, m_file)){
+                    return String(vec.data(), len);
+                }
             }
             return "";
         }

@@ -78,7 +78,7 @@ private:
     _ReadWriter_HMZ_ctx* m_ptr{nullptr};
 };
 
-typedef struct _ReadReader_HMZ_ctx __ReadReader_HMZ_ctx_ctx;
+typedef struct _ReadReader_HMZ_ctx _ReadReader_HMZ_ctx;
 class ReadReader_HMZ: public ReadReader{
 public:
     ReadReader_HMZ(CString file);

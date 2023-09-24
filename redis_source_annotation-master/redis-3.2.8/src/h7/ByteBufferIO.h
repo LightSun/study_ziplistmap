@@ -181,6 +181,9 @@ namespace h7 {
                 m_pos = 0;
             }
         }
+        void skip(size_t len){
+            m_pos += len;
+        }
         __BIO_GET0(Byte, char);
         __BIO_GET0(Int, int);
         __BIO_GET0(Short, short);
@@ -197,6 +200,12 @@ namespace h7 {
         void getData(uint64 len, void* out){
             memcpy(out, getCurDataPtr(), len);
             m_pos += len;
+        }
+        String getRawString(uint64 len){
+            String str;
+            str.resize(len);
+            getData(len, str.data());
+            return str;
         }
         String getString16(){
             auto len = getUShort();
