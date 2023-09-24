@@ -31,8 +31,8 @@ int main(int argc, char* argv[]){
     //test_JudyList();
 
     test_buffer_io();
-    //test_dna_compress();
-    //test_compressor();
+    test_dna_compress();
+    test_compressor();
     return 0;
 }
 
