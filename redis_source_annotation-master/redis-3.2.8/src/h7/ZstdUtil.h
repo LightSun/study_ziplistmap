@@ -63,17 +63,17 @@ public:
       ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, compressionlevel);
 
       size_t const toRead = buffInSize;
-      auto local_pos = 0;
+      size_t local_pos = 0;
       auto buff_tmp = const_cast<char*>(buffInTmp.c_str());
       for (;;) {
         size_t read = src.copy(buff_tmp, toRead, local_pos);
         local_pos += read;
 
-        int const lastChunk = (read < toRead);
+        bool const lastChunk = (read < toRead);
         ZSTD_EndDirective const mode = lastChunk ? ZSTD_e_end : ZSTD_e_continue;
 
         ZSTD_inBuffer input = {buffIn, read, 0};
-        int finished;
+        bool finished;
 
         do {
           ZSTD_outBuffer output = {buffOut, buffOutSize, 0};

@@ -11,10 +11,11 @@ class JudyList
 {
 public:
     using u8 = unsigned char;
+    using uint32 = unsigned int;
     using String = std::string;
     using CString = const std::string&;
 
-    JudyList();
+    JudyList(uint32 max_entry = 128);
     ~JudyList();
 
     void add(int index, CString data);

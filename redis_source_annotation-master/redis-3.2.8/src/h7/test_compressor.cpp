@@ -5,10 +5,12 @@ using namespace h7;
 
 static void test_common();
 static void test_dna_compress();
+static void test_dna_compress2();
 
 void test_compressor(){
     test_common();
     test_dna_compress();
+    test_dna_compress2();
 }
 
 void test_common(){
@@ -36,4 +38,18 @@ void test_dna_compress(){
     ASSERT(cm->deCompress(out, &str2) > 0, "deCompress failed");
 
     ASSERT(str == str2, "decode ok, but not eq with previous!");
+}
+void test_dna_compress2(){
+    printf("---------- test_dna_compress2 -------- \n");
+    DNACompressManager::get()->regAll();
+    auto cm = DNACompressManager::get()->getCompressor(kDNA_COMPRESS_HUFFMAN);
+
+    String str = "FFKKKFKKFKF<KK<F,AFKKKKK7FFK77<FKK,<F7K,,7AF<FF7FKK7AA,7<FA,,";
+    String out;
+    ASSERT(cm->compress(str, &out) > 0, "compress failed");
+    String str2;
+    ASSERT(cm->deCompress(out, &str2) > 0, "deCompress failed");
+
+    ASSERT(str == str2, "decode ok, but not eq with previous!");
+    LOGI("str.len = %lu, compressed len = %lu\n", str.length(), out.length());
 }

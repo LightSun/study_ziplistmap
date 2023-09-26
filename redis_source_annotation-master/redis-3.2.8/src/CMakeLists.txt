@@ -44,6 +44,7 @@ set(DEP_LIBS
     ${JUDY_LIBS}
     ${ZSTD_LIBS}
     z
+    pthread
     )
 
 ##

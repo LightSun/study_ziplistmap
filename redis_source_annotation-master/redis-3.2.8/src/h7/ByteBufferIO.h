@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <memory.h>
 #include <unordered_map>
 #include "c_common.h"
 #include "common.h"

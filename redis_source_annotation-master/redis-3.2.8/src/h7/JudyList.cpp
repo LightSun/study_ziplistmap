@@ -1,31 +1,176 @@
 #include "JudyList.h"
-#include <Judy.h>
 #include <memory.h>
 #include <vector>
 #include <sstream>
 #include <string.h>
 
+#include "common.h"
+
+#define JUDY_INTERNAL
+
+#ifdef JUDY_INTERNAL
+#include "judy_arrays.h"
+#else
+#include <Judy.h>
+#endif
 //JSLI not permit dup key.
 using namespace h7;
 namespace h7 {
+    using String = JudyList::String;
+    using CString = JudyList::CString;
 
-static inline void* _newChars(JudyList::CString c){
-    void* ptr = malloc(c.length() + 1);
-    memcpy(ptr, c.data(), c.length() + 1);
-    return ptr;
-}
-    struct _Item{
-        int index;
-        JudyList::String data;
+#ifdef JUDY_INTERNAL
+    struct _JudyList_ctx{
+        Judy m_judy {nullptr};
+        int m_size {0};
+        uint32_t m_max_entry;
+
+        _JudyList_ctx(uint32_t max_entry):m_max_entry(max_entry){
+            m_judy = judy_open(max_entry);
+        }
+        ~_JudyList_ctx(){
+            if(m_judy){
+                judy_close(m_judy);
+                m_judy = nullptr;
+            }
+        }
+        judyslot _newSlot(CString c){
+            void* v = judy_data(m_judy, c.length() + 1);
+            memcpy(v, c.data(), c.length() + 1);
+            return (judyslot)v;
+        }
+        int size(){
+            return m_size;
+        }
+        void add(CString c){
+            add(size(), c);
+        }
+        void add(int index, CString c){
+            auto slot = judy_cell(m_judy, (uchar*)&index, sizeof (int));
+            if(*slot){
+                judyslot preVal = *slot;
+                //*slot = _newSlot(c); //error?
+                while (true) {
+                    auto slot2 = judy_next(m_judy);
+                    if(!slot2){
+                        break;
+                    }
+                    judyslot _val = *slot2;
+                    *slot2 = preVal;
+                    preVal = _val;
+                }
+                //add last
+                slot = judy_cell(m_judy, (uchar*)&m_size, sizeof (int));
+                *slot = preVal;
+                //
+                slot = judy_slot(m_judy, (uchar*)&index, sizeof (int));
+                *slot = _newSlot(c);
+            }else{
+                *slot = _newSlot(c);
+            }
+            m_size ++;
+        }
+        void set(int index, CString c){
+            auto slot = judy_slot(m_judy, (uchar*)&index, sizeof (int));
+            if(*slot){
+                judy_del(m_judy);
+            }
+            slot = judy_cell(m_judy, (uchar*)&index, sizeof (int));
+            *slot = _newSlot(c);
+        }
+        String get(int index, CString def){
+            auto slot = judy_slot(m_judy, (uchar*)&index, sizeof (int));
+            if(*slot){
+                return String((char*)(*slot));
+            }
+            return def;
+        }
+        void removeAt(int index){
+            auto slot = judy_slot(m_judy, (uchar*)&index, sizeof (int));
+            if(*slot){
+                judy_del(m_judy);
+            }
+           // int last = m_size - 1;
+           // String lastVal = get(last, "");
+           for(int i = index, nextIdx; i < m_size - 1; ++i){
+                nextIdx = i + 1;
+                slot = judy_cell(m_judy, (uchar*)&i, sizeof (int));
+
+                auto slot2 = judy_slot(m_judy, (uchar*)&nextIdx, sizeof (int));
+                *slot = *slot2;
+                if(nextIdx == m_size - 1){
+                    *slot2 = 0;
+                    judy_del(m_judy);
+                }
+            }
+            m_size --;
+        }
+        void clear(){
+            if(m_judy){
+                judy_close(m_judy);
+            }
+            m_judy = judy_open(m_max_entry);
+        }
+        int indexOf(CString c){
+            auto slot = judy_start(m_judy, NULL, 0);
+            if(*slot){
+                int index = 0;
+                while (judy_key(m_judy, (uchar*)&index, sizeof(int)) > 0) {
+                    if(memcmp(c.data(), (void*)(*slot), c.length()) == 0){
+                        return index;
+                    }
+                    slot = judy_next(m_judy);
+                }
+            }
+            return -1;
+        }
+        void print(){
+            std::stringstream ss;
+            ss << "[";
+            auto slot = judy_start(m_judy, NULL, 0);
+            if(*slot){
+                int index = 0;
+                while (judy_key(m_judy, (uchar*)&index, sizeof(int)) > 0) {
+                    ss << (char*)(*slot);
+                    slot = judy_next(m_judy);
+                    if(slot && *slot){
+                        ss << ",";
+                    }
+                }
+            }
+            ss << "]";
+            auto str = ss.str();
+            printf("judy_print >>\n %s\n", str.data());
+        }
+        void toVector(std::vector<String>& vec){
+            auto slot = judy_start(m_judy, NULL, 0);
+            if(*slot){
+                int index = 0;
+                while (judy_key(m_judy, (uchar*)&index, sizeof(int)) > 0) {
+                    vec.emplace_back((char*)(*slot));
+                    slot = judy_next(m_judy);
+                }
+            }
+        }
     };
+#else
+    static inline void* _newChars(CString c){
+        void* ptr = malloc(c.length() + 1);
+        memcpy(ptr, c.data(), c.length() + 1);
+        return ptr;
+    }
     struct _JudyList_ctx{
         Pvoid_t PJArray {nullptr};
         int _size {0};
 
+        _JudyList_ctx(uint32_t max){
+            //
+        }
+
         int size(){
             return _size;
         }
-        void set(int index, JudyList::CString c){
+        void set(int index, CString c){
             set(index, _newChars(c));
         }
         void set(int index, void* p){
@@ -39,7 +184,7 @@ static inline void* _newChars(JudyList::CString c){
         void add(JudyList::CString c){
             _add(size(), _newChars(c));
         }
-        void _add(Word_t index ,JudyList::CString c){
+        void _add(Word_t index ,CString c){
             _add(index, _newChars(c));
         }
         void _add(Word_t id, void* p){
@@ -55,7 +200,7 @@ static inline void* _newChars(JudyList::CString c){
             }
             _size ++;
         }
-        void add(Word_t index, JudyList::CString c){
+        void add(Word_t index, CString c){
             //JLG;
             const int old_size = _size;
             JError_t err;
@@ -89,7 +234,7 @@ static inline void* _newChars(JudyList::CString c){
             }
             _size = old_size + 1;
         }
-        JudyList::String get(int index, JudyList::CString def){
+        JudyList::String get(int index, CString def){
             JError_t err;
             auto ret = JudyLGet((Pvoid_t)PJArray, index, &err);
             if(ret != PJERR){
@@ -142,7 +287,7 @@ static inline void* _newChars(JudyList::CString c){
             _size = 0;
             PJArray = nullptr;
         }
-        int indexOf(JudyList::CString c){
+        int indexOf(CString c){
             PWord_t PValue;
             Word_t index = 0;
             JError_t err;
@@ -180,7 +325,7 @@ static inline void* _newChars(JudyList::CString c){
             auto str = ss.str();
             printf("judy_print >>\n [%s]\n", str.data());
         }
-        void toVector(std::vector<JudyList::String>& vec){
+        void toVector(std::vector<String>& vec){
             PWord_t PValue;
             Word_t index = 0;
             JError_t err;
@@ -191,10 +336,11 @@ static inline void* _newChars(JudyList::CString c){
             }
         }
     };
+#endif
 }
 
-JudyList::JudyList(){
-    m_ptr = new _JudyList_ctx();
+JudyList::JudyList(uint32 max_entry){
+    m_ptr = new _JudyList_ctx(max_entry);
 }
 JudyList::~JudyList(){
     if(m_ptr){

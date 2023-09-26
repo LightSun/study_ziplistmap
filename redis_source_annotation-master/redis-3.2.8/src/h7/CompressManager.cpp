@@ -8,7 +8,7 @@ using namespace h7;
 struct ZSTD_CM: public Compressor{
 
     uint64 compress(CString in, String* out) override{
-        ZstdUtil::StreamCompressString(in, *out, ZSTD_defaultCLevel());
+        ZstdUtil::StreamCompressString(in, *out, ZSTD_maxCLevel());
         return out->length();
     }
     uint64 deCompress(CString in, String* out) override{

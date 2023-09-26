@@ -43,8 +43,8 @@ public:
     std::string compress(const std::string& input){
         auto str = _compress(input);
         auto fstr = _encodeFrequencies();
-        LOGE("compress >> str=%s\n", str.data());
-        LOGE("compress >> fstr=%s\n", fstr.data());
+        //LOGE("compress >> str=%s\n", str.data());
+        //LOGE("compress >> fstr=%s\n", fstr.data());
         //
         ByteBufferOut bout;
         bout.putString16(fstr);
@@ -57,8 +57,8 @@ public:
         auto fstr = bio.getString16();
         _decodeFrequencies(fstr);
         auto str = bio.getBinaryStringFromInts();
-        LOGE("decompress >> str=%s\n", str.data());
-        LOGE("decompress >> fstr=%s\n", fstr.data());
+        //LOGE("decompress >> str=%s\n", str.data());
+        //LOGE("decompress >> fstr=%s\n", fstr.data());
         return _decompress(str);
     }
 
@@ -75,6 +75,9 @@ private:
     }
     std::string _encodeFrequencies(){
         const int size = m_frequencies.size();
+        if(size > 5){
+            LOGE("_encodeFrequencies >> have special char. only permit ATCG ?? \n");
+        }
         //ASSERT(size <= 4, "have special char. only permit ATCG.");
         //size, data
         ByteBufferOut bout;

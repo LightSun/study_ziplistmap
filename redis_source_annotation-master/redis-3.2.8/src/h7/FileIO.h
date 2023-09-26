@@ -60,7 +60,7 @@ namespace h7 {
             return def;
         }
         String read(uint64 len){
-            ASSERT(len > 0, "");
+            ASSERT(len > 0, "len must > 0");
             if(m_file != nullptr){
                 std::vector<char> vec(len, 0);
                 if(fread(vec.data(), 1, len, m_file)){

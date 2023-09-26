@@ -14,21 +14,20 @@ extern void test_dna_compress();
 extern void test_JudyList();
 extern void test_compressor();
 extern void test_buffer_io();
+extern int test_fq_compress(int argc, char* argv[]);
 
 int main(int argc, char* argv[]){
     setbuf(stdout, NULL);
-    //test string if copy.
-//    const char* s = "abc";
-//    std::string str(s);
-//    printf("p1 = %p, p2 = %p\n", s, str.data());
+
+    //return test_fq_compress(argc, argv);
 
     //int ret = ziplistTest(argc, argv);
     //int ret = zipmapTest(argc, argv);
 
     test_Ziplist();
     test_QuickList();
-    //judy array on windows have bug.
-    //test_JudyList();
+    //old judy array on windows have bug.
+    test_JudyList();
 
     test_buffer_io();
     test_dna_compress();

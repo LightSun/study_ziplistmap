@@ -10,6 +10,7 @@ void test_JudyList(){
     list.add("abc2");
     list.add("abc3");
     list.add("abc4");
+    list.print();
     list.add(0, "abc");
 
     int idx = list.indexOf("abcdef2342434");

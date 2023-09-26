@@ -35,3 +35,4 @@ using CString = const std::string&;
 #endif
 
 #define LOGE(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+#define LOGI(fmt, ...) fprintf(stdout, fmt, ##__VA_ARGS__)
