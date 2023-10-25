@@ -17,6 +17,7 @@
 #include "DNACompressManager.h"
 #include "ByteBufferIO.h"
 #include "CountDownLatch.h"
+#include "src/quip.h"
 
 #include "kseq.h"
 KSEQ_INIT(gzFile, gzread)
@@ -372,8 +373,44 @@ ReadReader_HMZ::~ReadReader_HMZ(){
 bool ReadReader_HMZ::nextRead(Read* r){
     return m_ptr->nextRead(r);
 }
+namespace h7 {
+struct _ReadReader_QP_ctx{
+    FILE* fin {nullptr};
+    quip_in_t* in {nullptr};
+    _ReadReader_QP_ctx(CString inFile){
+        fin = _quip_open_fin(inFile.data());
+        ASSERT(fin, "open file failed: %s.", inFile.data());
+        in = quip_in_open_file(fin, QUIP_FMT_QUIP, QUIP_FILTER_NONE, 0, NULL);
+        ASSERT(in, "open qp file failed: %s", inFile.data());
+    }
+    ~_ReadReader_QP_ctx(){
+        close();
+    }
+    void close(){
+        if(in){
+            quip_in_close(in);
+            in = nullptr;
+        }
+        if(fin){
+            fclose(fin);
+            fin = nullptr;
+        }
+    }
+    bool nextRead(Read* r){
+        auto read = quip_read(in);
+    }
+};
+}
+ReadReader_QP::ReadReader_QP(CString file){
 
+}
+ReadReader_QP::~ReadReader_QP(){
 
+}
+
+bool ReadReader_QP::nextRead(Read* r){
+
+}
 //--------------------------------------------
 //NACTG 11111
 //XXXX -> 1111
@@ -560,6 +597,36 @@ void Fastqs::CompressFile(CString in, CString out){
     }
 }
 
+bool Fastqs::readOneRead(CString in, Read* r){
+    ReadReader_GZ reader(in);
+    return reader.nextRead(r);
+}
+bool Fastqs::compressGz2Qp(CString _in, CString _out){
+    auto fin = _quip_open_fin(_in.data());
+    if(!fin) return false;
+    auto fout = fopen(_out.data(), "wb");
+    if(!fout){
+        fclose(fin);
+        return false;
+    }
+    auto in = quip_in_open_file(fin, QUIP_FMT_FASTQ, QUIP_FILTER_GZIP, 0, NULL);
+    quip_aux_t  aux;
+    {
+        str_init(&aux.data);
+        quip_get_aux(in, &aux);
+    }
+    auto out = quip_out_open_file(fout, QUIP_FMT_QUIP, 0, &aux, nullptr);
+    while (quip_pipe(in, out));
+    fflush(fout);
+    quip_out_close(out);
+    quip_in_close(in);
+    //
+    fclose(fout);
+    fclose(fin);
+    return true;
+}
+
+//------------------------
 Fastqs::Fastqs(const FastqIOParams& ps){
     m_ptr = new _Fastqs_ctx(ps);
 }

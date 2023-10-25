@@ -47,6 +47,9 @@ set(DEP_LIBS
     pthread
     )
 
+## quip
+add_subdirectory(quip/)
+
 ##
 add_compile_definitions(REDIS_TEST)
 

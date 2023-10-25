@@ -99,6 +99,18 @@ private:
     _ReadReader_HMZ_ctx* m_ptr {nullptr};
 };
 
+//----------------------------
+typedef struct _ReadReader_QP_ctx _ReadReader_QP_ctx;
+class ReadReader_QP: public ReadReader{
+public:
+    ReadReader_QP(CString file);
+    ~ReadReader_QP();
+    bool nextRead(Read* r) override;
+
+private:
+    _ReadReader_QP_ctx* m_ptr {nullptr};
+};
+
 //-------------------------------------
 struct FastqIOParams{
     using uint32 = unsigned int;
@@ -121,6 +133,8 @@ public:
 
     static void Gz2Hmz(CString in, CString out, const FastqIOParams& = FastqIOParams());
     static void CompressFile(CString in, CString out);
+    static bool readOneRead(CString in, Read* r);
+    static bool compressGz2Qp(CString in, CString out);
 
     void gz2Hmz(CString in, CString out);
 

@@ -18,10 +18,25 @@ int test_fq_compress(int argc, char* argv[]){
     String outFile = _OUT_DIR + "202212proband.R1.fastq.hmz";
     String outFile2 = _OUT_DIR + "202212proband.R1.fastq.hmz2";
     //raw: 13073649953
-    Fastqs::Gz2Hmz(inFile, outFile);
+    //Fastqs::Gz2Hmz(inFile, outFile);
     //Fastqs fqs;
     //fqs.gz2Hmz(inFile, outFile);
     //Fastqs::CompressFile(outFile, outFile2);
+
+    {
+/*
+readOneRead: {name=A00869:44:HLYFLDSXX:2:1101:3549:1000,
+seq=NGTGGGAAAGGGGCGCGACATCAGCCTAGCGGCCCTGCAGCGCCACGACCCCTATATCAACCGCATCGTGGACGTGGCCAGCCAGGTGGCTCTGTACACCTTCGGCCATCGGGCCAACGAGTGGGTGCGTGCGGACGCGGCGGAGCAGTG,
+qual=#F:FFFFFFFFFFFFFFFFFFFFFFFFFF:FFFFFFFFFFFFFFFFFFFF:FF:FF:FFFFFFFFFFFFFFF:FFF:FFFFFFFF:FF:FF::FFFFFFF,FFFFFFFFFFFFFF:FFFFFFFFFFFF:FFFFFFFFFFFFFFFFFFFFF,
+comment=2:N:0:ATGCCTAA+AACCGTTC, lastChar=
+*/
+    inFile = "/media/heaven7/Elements/shengxin/test/2022EQA/202212/"
+                            "202212proband.R2.fastq.gz";
+    Read read;
+    Fastqs::readOneRead(inFile, &read);
+    auto str = read.toString();
+    printf("readOneRead: %s\n", str.data());
+    }
 
     //test_base(); //ok
     return 0;

@@ -9,9 +9,9 @@ using String = std::string;
 
 static void test_Ziplist();
 static void test_QuickList();
+extern void test_JudyList();
 
 extern void test_dna_compress();
-extern void test_JudyList();
 extern void test_compressor();
 extern void test_buffer_io();
 extern int test_fq_compress(int argc, char* argv[]);
@@ -29,9 +29,9 @@ int main(int argc, char* argv[]){
     //old judy array on windows have bug.
     test_JudyList();
 
-    test_buffer_io();
-    test_dna_compress();
-    test_compressor();
+    //test_buffer_io();
+   // test_dna_compress();
+   // test_compressor();
     return 0;
 }
 
